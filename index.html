@@ -3,281 +3,280 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Deltarune RP Prototype - Battle Mode</title>
+<title>Deltarune Soul Dodge</title>
 <style>
   body {
-    background: #222;
+    margin: 0; 
+    background: #111;
+    overflow: hidden;
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    height: 100vh;
     color: #eee;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    max-width: 600px;
-    margin: 50px auto;
-    padding: 20px;
-    border: 3px solid #555;
-    border-radius: 10px;
+    user-select: none;
   }
-  #dialogue {
-    background: #111;
-    padding: 20px;
-    border-radius: 8px;
-    min-height: 120px;
-    margin-bottom: 20px;
+  canvas {
+    background: #222;
+    border: 4px solid #e03e3e;
+    border-radius: 12px;
+    display: block;
+  }
+  #info {
+    position: fixed;
+    top: 10px; left: 50%;
+    transform: translateX(-50%);
     font-size: 18px;
-    line-height: 1.4;
-    white-space: pre-line;
+    text-align: center;
   }
-  #choices button {
-    background: #444;
-    border: none;
-    color: #eee;
-    padding: 10px 15px;
-    margin: 5px;
-    border-radius: 6px;
+  #game-over {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #e03e3e;
+    font-size: 48px;
+    font-weight: bold;
+    display: none;
+  }
+  #restart-btn {
+    position: fixed;
+    top: 60%; left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    font-size: 20px;
     cursor: pointer;
-    font-size: 16px;
-    transition: background 0.3s;
-  }
-  #choices button:hover {
-    background: #666;
-  }
-  .health-bar {
-    height: 20px;
-    background: #444;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    overflow: hidden;
-  }
-  .health-fill {
-    height: 100%;
     background: #e03e3e;
-    width: 100%;
-    transition: width 0.5s ease;
-  }
-  #player-health .health-fill {
-    background: #3ee06f;
-  }
-  #battle-ui {
-    margin-bottom: 20px;
+    border: none;
+    border-radius: 8px;
+    color: #111;
     display: none;
   }
 </style>
 </head>
 <body>
 
-<div id="dialogue">Welcome to the fucking Deltarune RP prototype. Ready to dive in?</div>
-
-<div id="battle-ui">
-  <div><strong>Your HP:</strong></div>
-  <div id="player-health" class="health-bar">
-    <div class="health-fill"></div>
-  </div>
-  <div><strong>Enemy HP:</strong></div>
-  <div id="enemy-health" class="health-bar">
-    <div class="health-fill"></div>
-  </div>
-</div>
-
-<div id="choices">
-  <button onclick="choose(0)">Hell yeah, let’s go!</button>
-  <button onclick="choose(1)">Nah, maybe later.</button>
-</div>
+<div id="info">Use arrow keys or WASD to move the soul. Dodge the damn bullets for as long as you fucking can!</div>
+<canvas id="game" width="600" height="600"></canvas>
+<div id="game-over">YOU FUCKING DIED</div>
+<button id="restart-btn">Restart</button>
 
 <script>
-  const dialogueEl = document.getElementById('dialogue');
-  const choicesEl = document.getElementById('choices');
-  const battleUI = document.getElementById('battle-ui');
-  const playerHealthFill = document.querySelector('#player-health .health-fill');
-  const enemyHealthFill = document.querySelector('#enemy-health .health-fill');
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const info = document.getElementById('info');
+  const gameOverText = document.getElementById('game-over');
+  const restartBtn = document.getElementById('restart-btn');
 
-  let player = { hp: 100, maxHp: 100, attack: 15, defending: false };
-  let enemy = { hp: 80, maxHp: 80, attack: 12 };
+  const width = canvas.width;
+  const height = canvas.height;
 
-  let currentNode = 0;
-  let inBattle = false;
+  // Player (Soul) properties
+  const soul = {
+    x: width / 2,
+    y: height / 2,
+    radius: 15,
+    speed: 5,
+    dx: 0,
+    dy: 0,
+  };
 
-  const script = [
-    {
-      text: "You find yourself in a dark hallway. What do you do?",
-      choices: [
-        { text: "Walk forward.", next: 1 },
-        { text: "Look around.", next: 2 }
-      ]
-    },
-    {
-      text: "You move ahead cautiously. Suddenly, a shadowy figure appears!",
-      choices: [
-        { text: "Talk to it.", next: 3 },
-        { text: "Prepare to fight.", next: 4 }
-      ]
-    },
-    {
-      text: "You spot some strange markings on the wall.",
-      choices: [
-        { text: "Inspect them.", next: 5 },
-        { text: "Ignore and move forward.", next: 1 }
-      ]
-    },
-    {
-      text: "The figure smiles. 'Welcome to the nightmare, friend.'",
-      choices: [
-        { text: "Fuck this shit, fight!", next: 4 },
-        { text: "Calmly listen.", next: 6 }
-      ]
-    },
-    {
-      text: "Battle initiated!",
-      choices: [],
-      battleStart: true
-    },
-    {
-      text: "The markings glow and you feel a surge of power. Nice.",
-      choices: [
-        { text: "Walk forward.", next: 1 }
-      ]
-    },
-    {
-      text: "The figure tells you secrets about the world. Shit’s getting deep.",
-      choices: [
-        { text: "Ask more.", next: 6 },
-        { text: "Say goodbye.", next: 0 }
-      ]
+  // Bullets array
+  let bullets = [];
+  let bulletSpeed = 3;
+  let spawnInterval = 1000; // ms, will get faster
+  let lastSpawn = 0;
+
+  let lastTime = 0;
+  let gameOver = false;
+  let survivalTime = 0;
+
+  // Control state
+  const keys = {};
+
+  // Event listeners for controls
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+  });
+  window.addEventListener('keyup', e => {
+    keys[e.key.toLowerCase()] = false;
+  });
+
+  restartBtn.addEventListener('click', () => {
+    resetGame();
+  });
+
+  function resetGame() {
+    gameOver = false;
+    bullets = [];
+    soul.x = width / 2;
+    soul.y = height / 2;
+    survivalTime = 0;
+    bulletSpeed = 3;
+    spawnInterval = 1000;
+    lastSpawn = 0;
+    lastTime = performance.now();
+    gameOverText.style.display = 'none';
+    restartBtn.style.display = 'none';
+    info.textContent = 'Use arrow keys or WASD to move the soul. Dodge the damn bullets for as long as you fucking can!';
+    requestAnimationFrame(gameLoop);
+  }
+
+  function spawnBullet() {
+    // Bullets spawn from random edge, heading towards soul with some randomness
+
+    const edges = ['top', 'right', 'bottom', 'left'];
+    const edge = edges[Math.floor(Math.random() * edges.length)];
+
+    let x, y, targetX, targetY;
+    targetX = soul.x + (Math.random() * 100 - 50); // slight aim randomness
+    targetY = soul.y + (Math.random() * 100 - 50);
+
+    switch(edge){
+      case 'top':
+        x = Math.random() * width;
+        y = -20;
+        break;
+      case 'right':
+        x = width + 20;
+        y = Math.random() * height;
+        break;
+      case 'bottom':
+        x = Math.random() * width;
+        y = height + 20;
+        break;
+      case 'left':
+        x = -20;
+        y = Math.random() * height;
+        break;
     }
-  ];
 
-  updateScene();
+    // Calculate velocity vector
+    const angle = Math.atan2(targetY - y, targetX - x);
+    const vx = Math.cos(angle) * bulletSpeed;
+    const vy = Math.sin(angle) * bulletSpeed;
 
-  function updateScene() {
-    if(inBattle) return;
+    bullets.push({ x, y, vx, vy, radius: 8 });
+  }
 
-    const node = script[currentNode];
-    dialogueEl.textContent = node.text;
-    choicesEl.innerHTML = '';
+  function updateSoul(){
+    soul.dx = 0;
+    soul.dy = 0;
+    if(keys['arrowleft'] || keys['a']) soul.dx = -soul.speed;
+    if(keys['arrowright'] || keys['d']) soul.dx = soul.speed;
+    if(keys['arrowup'] || keys['w']) soul.dy = -soul.speed;
+    if(keys['arrowdown'] || keys['s']) soul.dy = soul.speed;
 
-    if(node.battleStart){
-      startBattle();
-      return;
+    // Normalize diagonal speed so it doesn't get faster
+    if(soul.dx !== 0 && soul.dy !== 0){
+      soul.dx *= Math.SQRT1_2;
+      soul.dy *= Math.SQRT1_2;
     }
 
-    node.choices.forEach((choice, idx) => {
-      const btn = document.createElement('button');
-      btn.textContent = choice.text;
-      btn.onclick = () => choose(idx);
-      choicesEl.appendChild(btn);
+    soul.x += soul.dx;
+    soul.y += soul.dy;
+
+    // Clamp inside canvas
+    soul.x = Math.min(width - soul.radius, Math.max(soul.radius, soul.x));
+    soul.y = Math.min(height - soul.radius, Math.max(soul.radius, soul.y));
+  }
+
+  function updateBullets(delta){
+    bullets.forEach(b => {
+      b.x += b.vx;
+      b.y += b.vy;
+    });
+
+    // Remove bullets that go off screen
+    bullets = bullets.filter(b => b.x > -30 && b.x < width + 30 && b.y > -30 && b.y < height + 30);
+  }
+
+  function drawSoul(){
+    ctx.beginPath();
+    ctx.fillStyle = '#e03e3e';
+    ctx.shadowColor = '#e03e3e';
+    ctx.shadowBlur = 15;
+    ctx.arc(soul.x, soul.y, soul.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawBullets(){
+    ctx.fillStyle = '#ffffff';
+    bullets.forEach(b => {
+      ctx.beginPath();
+      ctx.shadowColor = '#fff';
+      ctx.shadowBlur = 8;
+      ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
     });
   }
 
-  function choose(choiceIdx){
-    if(inBattle) return;
-
-    const node = script[currentNode];
-    const choice = node.choices[choiceIdx];
-    currentNode = choice.next;
-    updateScene();
+  function checkCollision(){
+    for(let b of bullets){
+      const dx = b.x - soul.x;
+      const dy = b.y - soul.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if(dist < b.radius + soul.radius){
+        return true;
+      }
+    }
+    return false;
   }
 
-  function startBattle(){
-    inBattle = true;
-    battleUI.style.display = 'block';
-    dialogueEl.textContent = "Enemy appears! What the fuck do you do?";
-    showBattleChoices();
-    updateHealthBars();
-  }
+  function gameLoop(timestamp){
+    if(!lastTime) lastTime = timestamp;
+    const delta = timestamp - lastTime;
+    lastTime = timestamp;
 
-  function showBattleChoices(){
-    choicesEl.innerHTML = '';
-
-    const attackBtn = document.createElement('button');
-    attackBtn.textContent = 'Attack';
-    attackBtn.onclick = playerAttack;
-    choicesEl.appendChild(attackBtn);
-
-    const defendBtn = document.createElement('button');
-    defendBtn.textContent = 'Defend';
-    defendBtn.onclick = playerDefend;
-    choicesEl.appendChild(defendBtn);
-  }
-
-  function updateHealthBars(){
-    playerHealthFill.style.width = (player.hp / player.maxHp * 100) + '%';
-    enemyHealthFill.style.width = (enemy.hp / enemy.maxHp * 100) + '%';
-  }
-
-  function playerAttack(){
-    player.defending = false;
-    let damage = player.attack + Math.floor(Math.random() * 6) - 3;
-    damage = Math.max(1, damage);
-    enemy.hp -= damage;
-    dialogueEl.textContent = `You fucking attack the enemy and deal ${damage} damage!`;
-    updateHealthBars();
-
-    if(enemy.hp <= 0){
-      endBattle(true);
+    if(gameOver){
       return;
     }
 
-    choicesEl.innerHTML = '';
-    setTimeout(enemyTurn, 1500);
-  }
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
 
-  function playerDefend(){
-    player.defending = true;
-    dialogueEl.textContent = 'You brace yourself, ready to block the next attack.';
-    choicesEl.innerHTML = '';
-    setTimeout(enemyTurn, 1500);
-  }
+    // Update player
+    updateSoul();
 
-  function enemyTurn(){
-    if(enemy.hp <= 0) return;
-
-    let damage = enemy.attack + Math.floor(Math.random() * 6) - 3;
-    damage = Math.max(1, damage);
-
-    if(player.defending){
-      damage = Math.floor(damage / 2);
-      dialogueEl.textContent += `\nEnemy attacks, but you block half the damage! You take ${damage} damage.`;
-    } else {
-      dialogueEl.textContent += `\nEnemy attacks and hits you for ${damage} damage!`;
+    // Spawn bullets faster over time
+    if(timestamp - lastSpawn > spawnInterval){
+      spawnBullet();
+      lastSpawn = timestamp;
+      // Make shit harder gradually
+      if(spawnInterval > 250) spawnInterval -= 10;
+      bulletSpeed += 0.005;
     }
 
-    player.hp -= damage;
-    updateHealthBars();
+    // Update bullets
+    updateBullets(delta);
 
-    if(player.hp <= 0){
-      endBattle(false);
+    // Draw everything
+    drawSoul();
+    drawBullets();
+
+    // Check collision
+    if(checkCollision()){
+      gameOver = true;
+      gameOverText.style.display = 'block';
+      restartBtn.style.display = 'block';
+      info.textContent = `You lasted ${(survivalTime / 1000).toFixed(2)} seconds. Not bad, but not good enough!`;
       return;
     }
 
-    setTimeout(() => {
-      dialogueEl.textContent += "\nWhat the fuck do you do now?";
-      showBattleChoices();
-    }, 1500);
+    survivalTime += delta;
+
+    // Draw survival time
+    ctx.fillStyle = '#eee';
+    ctx.font = '20px monospace';
+    ctx.fillText(`Time: ${(survivalTime / 1000).toFixed(2)}s`, 10, 30);
+
+    requestAnimationFrame(gameLoop);
   }
 
-  function endBattle(playerWon){
-    inBattle = false;
-    battleUI.style.display = 'none';
-
-    if(playerWon){
-      dialogueEl.textContent = 'You fucking won the battle! Ready for what’s next?';
-      currentNode = 0;
-      player.hp = player.maxHp; // heal player after win
-      enemy.hp = enemy.maxHp;  // reset enemy
-    } else {
-      dialogueEl.textContent = 'You got your ass handed to you. Game over, motherfucker.';
-      choicesEl.innerHTML = '<button onclick="restartGame()">Restart</button>';
-      return;
-    }
-
-    updateScene();
-  }
-
-  function restartGame(){
-    player.hp = player.maxHp;
-    enemy.hp = enemy.maxHp;
-    currentNode = 0;
-    updateScene();
-  }
+  resetGame();
 </script>
 
 </body>
 </html>
-
