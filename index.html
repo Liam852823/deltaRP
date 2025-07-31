@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Deltarune Soul Dodge</title>
+<title>Deltarune Soul Dodge - More Fucking Enemies</title>
 <style>
   body {
     margin: 0; 
@@ -25,23 +25,29 @@
   }
   #info {
     position: fixed;
-    top: 10px; left: 50%;
+    top: 10px; 
+    left: 50%;
     transform: translateX(-50%);
     font-size: 18px;
     text-align: center;
+    z-index: 10;
   }
   #game-over {
     position: fixed;
-    top: 50%; left: 50%;
+    top: 50%; 
+    left: 50%;
     transform: translate(-50%, -50%);
     color: #e03e3e;
     font-size: 48px;
     font-weight: bold;
     display: none;
+    z-index: 11;
+    text-shadow: 0 0 10px #e03e3e;
   }
   #restart-btn {
     position: fixed;
-    top: 60%; left: 50%;
+    top: 60%; 
+    left: 50%;
     transform: translateX(-50%);
     padding: 12px 24px;
     font-size: 20px;
@@ -51,14 +57,22 @@
     border-radius: 8px;
     color: #111;
     display: none;
+    z-index: 11;
   }
 </style>
 </head>
 <body>
 
-<div id="info">Use arrow keys or WASD to move the soul. Dodge the damn bullets for as long as you fucking can!</div>
+<div id="info">
+  Use arrow keys or WASD to move the soul.<br>
+  Dodge the damn bullets for as long as you fucking can!<br>
+  Now with fast, big, AND homing bullets. Good luck, asshole.
+</div>
+
 <canvas id="game" width="600" height="600"></canvas>
+
 <div id="game-over">YOU FUCKING DIED</div>
+
 <button id="restart-btn">Restart</button>
 
 <script>
@@ -71,7 +85,6 @@
   const width = canvas.width;
   const height = canvas.height;
 
-  // Player (Soul) properties
   const soul = {
     x: width / 2,
     y: height / 2,
@@ -81,20 +94,15 @@
     dy: 0,
   };
 
-  // Bullets array
   let bullets = [];
-  let bulletSpeed = 3;
-  let spawnInterval = 1000; // ms, will get faster
   let lastSpawn = 0;
-
-  let lastTime = 0;
-  let gameOver = false;
+  let spawnInterval = 1000; // ms
   let survivalTime = 0;
+  let gameOver = false;
 
   // Control state
   const keys = {};
 
-  // Event listeners for controls
   window.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
   });
@@ -106,57 +114,71 @@
     resetGame();
   });
 
-  function resetGame() {
-    gameOver = false;
-    bullets = [];
-    soul.x = width / 2;
-    soul.y = height / 2;
-    survivalTime = 0;
-    bulletSpeed = 3;
-    spawnInterval = 1000;
-    lastSpawn = 0;
-    lastTime = performance.now();
-    gameOverText.style.display = 'none';
-    restartBtn.style.display = 'none';
-    info.textContent = 'Use arrow keys or WASD to move the soul. Dodge the damn bullets for as long as you fucking can!';
-    requestAnimationFrame(gameLoop);
-  }
+  // Different bullet types with properties
+  // type: 'fast', 'big', 'homing'
+  // fast = small, fast bullets
+  // big = big, slow bullets
+  // homing = medium size, slowly chase you
 
   function spawnBullet() {
-    // Bullets spawn from random edge, heading towards soul with some randomness
-
     const edges = ['top', 'right', 'bottom', 'left'];
     const edge = edges[Math.floor(Math.random() * edges.length)];
 
-    let x, y, targetX, targetY;
-    targetX = soul.x + (Math.random() * 100 - 50); // slight aim randomness
-    targetY = soul.y + (Math.random() * 100 - 50);
+    // Pick a random bullet type weighted (you can tweak this)
+    const types = ['fast', 'fast', 'fast', 'big', 'homing']; 
+    const type = types[Math.floor(Math.random() * types.length)];
+
+    let x, y;
 
     switch(edge){
       case 'top':
         x = Math.random() * width;
-        y = -20;
+        y = -30;
         break;
       case 'right':
-        x = width + 20;
+        x = width + 30;
         y = Math.random() * height;
         break;
       case 'bottom':
         x = Math.random() * width;
-        y = height + 20;
+        y = height + 30;
         break;
       case 'left':
-        x = -20;
+        x = -30;
         y = Math.random() * height;
         break;
     }
 
-    // Calculate velocity vector
-    const angle = Math.atan2(targetY - y, targetX - x);
-    const vx = Math.cos(angle) * bulletSpeed;
-    const vy = Math.sin(angle) * bulletSpeed;
+    let radius, speed, vx, vy;
 
-    bullets.push({ x, y, vx, vy, radius: 8 });
+    if(type === 'fast'){
+      radius = 6;
+      speed = 5 + survivalTime * 0.001; // speeds up a little over time
+      // shoot roughly at soul with randomness
+      let targetX = soul.x + (Math.random() * 100 - 50);
+      let targetY = soul.y + (Math.random() * 100 - 50);
+      const angle = Math.atan2(targetY - y, targetX - x);
+      vx = Math.cos(angle) * speed;
+      vy = Math.sin(angle) * speed;
+    } 
+    else if(type === 'big'){
+      radius = 14;
+      speed = 2 + survivalTime * 0.0005; // slow and heavy
+      let targetX = soul.x + (Math.random() * 200 - 100);
+      let targetY = soul.y + (Math.random() * 200 - 100);
+      const angle = Math.atan2(targetY - y, targetX - x);
+      vx = Math.cos(angle) * speed;
+      vy = Math.sin(angle) * speed;
+    } 
+    else if(type === 'homing'){
+      radius = 10;
+      speed = 3 + survivalTime * 0.0007; // medium speed homing bullet
+      // homing bullets get their velocity updated every frame, start with zero velocity for now
+      vx = 0;
+      vy = 0;
+    }
+
+    bullets.push({ x, y, vx, vy, radius, type, speed });
   }
 
   function updateSoul(){
@@ -167,7 +189,6 @@
     if(keys['arrowup'] || keys['w']) soul.dy = -soul.speed;
     if(keys['arrowdown'] || keys['s']) soul.dy = soul.speed;
 
-    // Normalize diagonal speed so it doesn't get faster
     if(soul.dx !== 0 && soul.dy !== 0){
       soul.dx *= Math.SQRT1_2;
       soul.dy *= Math.SQRT1_2;
@@ -176,19 +197,23 @@
     soul.x += soul.dx;
     soul.y += soul.dy;
 
-    // Clamp inside canvas
     soul.x = Math.min(width - soul.radius, Math.max(soul.radius, soul.x));
     soul.y = Math.min(height - soul.radius, Math.max(soul.radius, soul.y));
   }
 
   function updateBullets(delta){
     bullets.forEach(b => {
+      if(b.type === 'homing'){
+        // Update velocity toward soul
+        const angle = Math.atan2(soul.y - b.y, soul.x - b.x);
+        b.vx = Math.cos(angle) * b.speed;
+        b.vy = Math.sin(angle) * b.speed;
+      }
       b.x += b.vx;
       b.y += b.vy;
     });
 
-    // Remove bullets that go off screen
-    bullets = bullets.filter(b => b.x > -30 && b.x < width + 30 && b.y > -30 && b.y < height + 30);
+    bullets = bullets.filter(b => b.x > -50 && b.x < width + 50 && b.y > -50 && b.y < height + 50);
   }
 
   function drawSoul(){
@@ -202,11 +227,21 @@
   }
 
   function drawBullets(){
-    ctx.fillStyle = '#ffffff';
     bullets.forEach(b => {
       ctx.beginPath();
-      ctx.shadowColor = '#fff';
-      ctx.shadowBlur = 8;
+      if(b.type === 'fast') {
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = 8;
+      } else if(b.type === 'big'){
+        ctx.fillStyle = '#ff5555';
+        ctx.shadowColor = '#ff5555';
+        ctx.shadowBlur = 12;
+      } else if(b.type === 'homing'){
+        ctx.fillStyle = '#55ffff';
+        ctx.shadowColor = '#55ffff';
+        ctx.shadowBlur = 12;
+      }
       ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
@@ -230,33 +265,25 @@
     const delta = timestamp - lastTime;
     lastTime = timestamp;
 
-    if(gameOver){
-      return;
-    }
+    if(gameOver) return;
 
-    // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Update player
     updateSoul();
 
-    // Spawn bullets faster over time
     if(timestamp - lastSpawn > spawnInterval){
       spawnBullet();
       lastSpawn = timestamp;
       // Make shit harder gradually
       if(spawnInterval > 250) spawnInterval -= 10;
-      bulletSpeed += 0.005;
+      survivalTime += delta;
     }
 
-    // Update bullets
     updateBullets(delta);
 
-    // Draw everything
     drawSoul();
     drawBullets();
 
-    // Check collision
     if(checkCollision()){
       gameOver = true;
       gameOverText.style.display = 'block';
@@ -265,9 +292,6 @@
       return;
     }
 
-    survivalTime += delta;
-
-    // Draw survival time
     ctx.fillStyle = '#eee';
     ctx.font = '20px monospace';
     ctx.fillText(`Time: ${(survivalTime / 1000).toFixed(2)}s`, 10, 30);
@@ -275,6 +299,22 @@
     requestAnimationFrame(gameLoop);
   }
 
+  function resetGame(){
+    gameOver = false;
+    bullets = [];
+    soul.x = width / 2;
+    soul.y = height / 2;
+    survivalTime = 0;
+    spawnInterval = 1000;
+    lastSpawn = 0;
+    lastTime = performance.now();
+    gameOverText.style.display = 'none';
+    restartBtn.style.display = 'none';
+    info.textContent = 'Use arrow keys or WASD to move the soul. Dodge the damn bullets for as long as you fucking can! Now with fast, big, AND homing bullets. Good luck, asshole.';
+    requestAnimationFrame(gameLoop);
+  }
+
+  let lastTime = 0;
   resetGame();
 </script>
 
