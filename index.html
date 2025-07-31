@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Deltarune RP Prototype</title>
+<title>Deltarune RP Prototype - Battle Mode</title>
 <style>
   body {
     background: #222;
@@ -38,11 +38,41 @@
   #choices button:hover {
     background: #666;
   }
+  .health-bar {
+    height: 20px;
+    background: #444;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .health-fill {
+    height: 100%;
+    background: #e03e3e;
+    width: 100%;
+    transition: width 0.5s ease;
+  }
+  #player-health .health-fill {
+    background: #3ee06f;
+  }
+  #battle-ui {
+    margin-bottom: 20px;
+  }
 </style>
 </head>
 <body>
 
 <div id="dialogue">Welcome to the fucking Deltarune RP prototype. Ready to dive in?</div>
+
+<div id="battle-ui" style="display:none;">
+  <div><strong>Your HP:</strong></div>
+  <div id="player-health" class="health-bar">
+    <div class="health-fill"></div>
+  </div>
+  <div><strong>Enemy HP:</strong></div>
+  <div id="enemy-health" class="health-bar">
+    <div class="health-fill"></div>
+  </div>
+</div>
 
 <div id="choices">
   <button onclick="choose(0)">Hell yeah, let’s go!</button>
@@ -52,6 +82,17 @@
 <script>
   const dialogueEl = document.getElementById('dialogue');
   const choicesEl = document.getElementById('choices');
+  const battleUI = document.getElementById('battle-ui');
+  const playerHealthFill = document.querySelector('#player-health .health-fill');
+  const enemyHealthFill = document.querySelector('#enemy-health .health-fill');
+
+  // Player & Enemy stats
+  let player = { hp: 100, maxHp: 100, attack: 15, defending: false };
+  let enemy = { hp: 80, maxHp: 80, attack: 12 };
+
+  // Game states
+  let currentNode = 0;
+  let inBattle = false;
 
   // Dialogue tree
   const script = [
@@ -84,10 +125,9 @@
       ]
     },
     {
-      text: "Battle system not implemented yet. For now, just chill and enjoy the fucking story.",
-      choices: [
-        { text: "Go back.", next: 0 }
-      ]
+      text: "Battle initiated!",
+      choices: [],
+      battleStart: true
     },
     {
       text: "The markings glow and you feel a surge of power. Nice.",
@@ -104,25 +144,138 @@
     }
   ];
 
-  let currentNode = 0;
-
-  function choose(choiceIndex) {
-    const node = script[currentNode];
-    const choice = node.choices[choiceIndex];
-    currentNode = choice.next;
-    updateScene();
-  }
+  // Start the game
+  updateScene();
 
   function updateScene() {
+    if (inBattle) return; // Block scene updates during battle
+
     const node = script[currentNode];
     dialogueEl.textContent = node.text;
     choicesEl.innerHTML = '';
+
+    // Check if this node triggers battle
+    if (node.battleStart) {
+      startBattle();
+      return;
+    }
+
     node.choices.forEach((choice, index) => {
       const btn = document.createElement('button');
       btn.textContent = choice.text;
       btn.onclick = () => choose(index);
       choicesEl.appendChild(btn);
     });
+  }
+
+  function choose(choiceIndex) {
+    if (inBattle) return; // Ignore choices during battle
+
+    const node = script[currentNode];
+    const choice = node.choices[choiceIndex];
+    currentNode = choice.next;
+    updateScene();
+  }
+
+  // Battle functions
+  function startBattle() {
+    inBattle = true;
+    battleUI.style.display = 'block';
+    dialogueEl.textContent = "Enemy appears! What the fuck do you do?";
+    showBattleChoices();
+    updateHealthBars();
+  }
+
+  function showBattleChoices() {
+    choicesEl.innerHTML = '';
+    const attackBtn = document.createElement('button');
+    attackBtn.textContent = 'Attack';
+    attackBtn.onclick = playerAttack;
+    choicesEl.appendChild(attackBtn);
+
+    const defendBtn = document.createElement('button');
+    defendBtn.textContent = 'Defend';
+    defendBtn.onclick = playerDefend;
+    choicesEl.appendChild(defendBtn);
+  }
+
+  function updateHealthBars() {
+    playerHealthFill.style.width = (player.hp / player.maxHp) * 100 + '%';
+    enemyHealthFill.style.width = (enemy.hp / enemy.maxHp) * 100 + '%';
+  }
+
+  function playerAttack() {
+    player.defending = false;
+    let damage = player.attack + Math.floor(Math.random() * 6) - 3;
+    damage = Math.max(1, damage);
+    enemy.hp -= damage;
+    dialogueEl.textContent = `You fucking attack the enemy and deal ${damage} damage!`;
+    updateHealthBars();
+
+    if (enemy.hp <= 0) {
+      endBattle(true);
+      return;
+    }
+
+    setTimeout(enemyTurn, 1500);
+    choicesEl.innerHTML = '';
+  }
+
+  function playerDefend() {
+    player.defending = true;
+    dialogueEl.textContent = 'You brace yourself, ready to block the next attack.';
+    choicesEl.innerHTML = '';
+    setTimeout(enemyTurn, 1500);
+  }
+
+  function enemyTurn() {
+    if (enemy.hp <= 0) return; // Enemy dead
+
+    let damage = enemy.attack + Math.floor(Math.random() * 6) - 3;
+    damage = Math.max(1, damage);
+
+    if (player.defending) {
+      damage = Math.floor(damage / 2);
+      dialogueEl.textContent += `\nEnemy attacks, but you block half the damage! You take ${damage} damage.`;
+    } else {
+      dialogueEl.textContent += `\nEnemy attacks and hits you for ${damage} damage!`;
+    }
+
+    player.hp -= damage;
+    updateHealthBars();
+
+    if (player.hp <= 0) {
+      endBattle(false);
+      return;
+    }
+
+    setTimeout(() => {
+      dialogueEl.textContent += '\nWhat the fuck do you do now?';
+      showBattleChoices();
+    }, 1500);
+  }
+
+  function endBattle(playerWon) {
+    inBattle = false;
+    battleUI.style.display = 'none';
+
+    if (playerWon) {
+      dialogueEl.textContent = 'You fucking won the battle! Ready for what’s next?';
+      currentNode = 0; // Reset or advance story as you like
+    } else {
+      dialogueEl.textContent = 'You got your ass handed to you. Game over, motherfucker.';
+      choicesEl.innerHTML = '<button onclick="restartGame()">Restart</button>';
+      return;
+    }
+
+    updateScene();
+  }
+
+  function restartGame() {
+    player.hp = player.maxHp;
+    enemy.hp = enemy.maxHp;
+    currentNode = 0;
+    updateScene();
   }
 </script>
 
