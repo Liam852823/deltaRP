@@ -23,6 +23,7 @@
     margin-bottom: 20px;
     font-size: 18px;
     line-height: 1.4;
+    white-space: pre-line;
   }
   #choices button {
     background: #444;
@@ -56,6 +57,7 @@
   }
   #battle-ui {
     margin-bottom: 20px;
+    display: none;
   }
 </style>
 </head>
@@ -63,7 +65,7 @@
 
 <div id="dialogue">Welcome to the fucking Deltarune RP prototype. Ready to dive in?</div>
 
-<div id="battle-ui" style="display:none;">
+<div id="battle-ui">
   <div><strong>Your HP:</strong></div>
   <div id="player-health" class="health-bar">
     <div class="health-fill"></div>
@@ -86,15 +88,12 @@
   const playerHealthFill = document.querySelector('#player-health .health-fill');
   const enemyHealthFill = document.querySelector('#enemy-health .health-fill');
 
-  // Player & Enemy stats
   let player = { hp: 100, maxHp: 100, attack: 15, defending: false };
   let enemy = { hp: 80, maxHp: 80, attack: 12 };
 
-  // Game states
   let currentNode = 0;
   let inBattle = false;
 
-  // Dialogue tree
   const script = [
     {
       text: "You find yourself in a dark hallway. What do you do?",
@@ -144,41 +143,38 @@
     }
   ];
 
-  // Start the game
   updateScene();
 
   function updateScene() {
-    if (inBattle) return; // Block scene updates during battle
+    if(inBattle) return;
 
     const node = script[currentNode];
     dialogueEl.textContent = node.text;
     choicesEl.innerHTML = '';
 
-    // Check if this node triggers battle
-    if (node.battleStart) {
+    if(node.battleStart){
       startBattle();
       return;
     }
 
-    node.choices.forEach((choice, index) => {
+    node.choices.forEach((choice, idx) => {
       const btn = document.createElement('button');
       btn.textContent = choice.text;
-      btn.onclick = () => choose(index);
+      btn.onclick = () => choose(idx);
       choicesEl.appendChild(btn);
     });
   }
 
-  function choose(choiceIndex) {
-    if (inBattle) return; // Ignore choices during battle
+  function choose(choiceIdx){
+    if(inBattle) return;
 
     const node = script[currentNode];
-    const choice = node.choices[choiceIndex];
+    const choice = node.choices[choiceIdx];
     currentNode = choice.next;
     updateScene();
   }
 
-  // Battle functions
-  function startBattle() {
+  function startBattle(){
     inBattle = true;
     battleUI.style.display = 'block';
     dialogueEl.textContent = "Enemy appears! What the fuck do you do?";
@@ -186,8 +182,9 @@
     updateHealthBars();
   }
 
-  function showBattleChoices() {
+  function showBattleChoices(){
     choicesEl.innerHTML = '';
+
     const attackBtn = document.createElement('button');
     attackBtn.textContent = 'Attack';
     attackBtn.onclick = playerAttack;
@@ -199,12 +196,12 @@
     choicesEl.appendChild(defendBtn);
   }
 
-  function updateHealthBars() {
-    playerHealthFill.style.width = (player.hp / player.maxHp) * 100 + '%';
-    enemyHealthFill.style.width = (enemy.hp / enemy.maxHp) * 100 + '%';
+  function updateHealthBars(){
+    playerHealthFill.style.width = (player.hp / player.maxHp * 100) + '%';
+    enemyHealthFill.style.width = (enemy.hp / enemy.maxHp * 100) + '%';
   }
 
-  function playerAttack() {
+  function playerAttack(){
     player.defending = false;
     let damage = player.attack + Math.floor(Math.random() * 6) - 3;
     damage = Math.max(1, damage);
@@ -212,29 +209,29 @@
     dialogueEl.textContent = `You fucking attack the enemy and deal ${damage} damage!`;
     updateHealthBars();
 
-    if (enemy.hp <= 0) {
+    if(enemy.hp <= 0){
       endBattle(true);
       return;
     }
 
-    setTimeout(enemyTurn, 1500);
     choicesEl.innerHTML = '';
+    setTimeout(enemyTurn, 1500);
   }
 
-  function playerDefend() {
+  function playerDefend(){
     player.defending = true;
     dialogueEl.textContent = 'You brace yourself, ready to block the next attack.';
     choicesEl.innerHTML = '';
     setTimeout(enemyTurn, 1500);
   }
 
-  function enemyTurn() {
-    if (enemy.hp <= 0) return; // Enemy dead
+  function enemyTurn(){
+    if(enemy.hp <= 0) return;
 
     let damage = enemy.attack + Math.floor(Math.random() * 6) - 3;
     damage = Math.max(1, damage);
 
-    if (player.defending) {
+    if(player.defending){
       damage = Math.floor(damage / 2);
       dialogueEl.textContent += `\nEnemy attacks, but you block half the damage! You take ${damage} damage.`;
     } else {
@@ -244,24 +241,26 @@
     player.hp -= damage;
     updateHealthBars();
 
-    if (player.hp <= 0) {
+    if(player.hp <= 0){
       endBattle(false);
       return;
     }
 
     setTimeout(() => {
-      dialogueEl.textContent += '\nWhat the fuck do you do now?';
+      dialogueEl.textContent += "\nWhat the fuck do you do now?";
       showBattleChoices();
     }, 1500);
   }
 
-  function endBattle(playerWon) {
+  function endBattle(playerWon){
     inBattle = false;
     battleUI.style.display = 'none';
 
-    if (playerWon) {
+    if(playerWon){
       dialogueEl.textContent = 'You fucking won the battle! Ready for what’s next?';
-      currentNode = 0; // Reset or advance story as you like
+      currentNode = 0;
+      player.hp = player.maxHp; // heal player after win
+      enemy.hp = enemy.maxHp;  // reset enemy
     } else {
       dialogueEl.textContent = 'You got your ass handed to you. Game over, motherfucker.';
       choicesEl.innerHTML = '<button onclick="restartGame()">Restart</button>';
@@ -271,7 +270,7 @@
     updateScene();
   }
 
-  function restartGame() {
+  function restartGame(){
     player.hp = player.maxHp;
     enemy.hp = enemy.maxHp;
     currentNode = 0;
@@ -281,3 +280,4 @@
 
 </body>
 </html>
+
