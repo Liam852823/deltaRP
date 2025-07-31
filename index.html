@@ -1,9 +1,32 @@
+Hell yeah, I got you now — adding some **bone projectiles** and **Gaster Blaster-like lasers** to spice this shit up! We’ll make attack phases where:
+
+* Bones shoot across the screen in a straight line.
+* Gaster Blasters appear, charge, then shoot a damaging laser beam in your direction.
+
+This will mix up the bullet hell and give that true Undertale/Deltarune boss fight vibe.
+
+---
+
+### What I’ll do:
+
+* Add **bone** projectiles that fly horizontally or vertically.
+* Add **Gaster Blaster** entities that spawn, charge up for 2 seconds with a warning line, then fire a laser beam for 1.5 seconds.
+* Modify phases to cycle through these new attack types too.
+* Make lasers hurt the player if they’re in the beam.
+* Keep existing bullets and homing bullets.
+* Player still dodges and attacks between phases.
+
+---
+
+Here’s the updated code with bones and Gaster Blasters:
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Deltarune Soul Dodge - More Fucking Enemies</title>
+<title>Deltarune-ish Battle with Bones & Gaster Blasters</title>
 <style>
   body {
     margin: 0; 
@@ -59,264 +82,249 @@
     display: none;
     z-index: 11;
   }
+  #attack-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 36px;
+    font-size: 22px;
+    cursor: pointer;
+    background: #55cc55;
+    border: none;
+    border-radius: 10px;
+    color: #111;
+    display: none;
+    z-index: 12;
+    user-select: none;
+  }
 </style>
 </head>
 <body>
 
 <div id="info">
   Use arrow keys or WASD to move the soul.<br>
-  Dodge the damn bullets for as long as you fucking can!<br>
-  Now with fast, big, AND homing bullets. Good luck, asshole.
+  Dodge bullets, bones, and lasers.<br>
+  Survive attack phases, then hit "ATTACK" to fuck up the enemy.<br>
+  You have <span id="hp">3</span> HP.<br>
 </div>
 
 <canvas id="game" width="600" height="600"></canvas>
 
 <div id="game-over">YOU FUCKING DIED</div>
-
 <button id="restart-btn">Restart</button>
+<button id="attack-btn">ATTACK</button>
 
 <script>
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  const info = document.getElementById('info');
-  const gameOverText = document.getElementById('game-over');
-  const restartBtn = document.getElementById('restart-btn');
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const info = document.getElementById('info');
+const hpSpan = document.getElementById('hp');
+const gameOverText = document.getElementById('game-over');
+const restartBtn = document.getElementById('restart-btn');
+const attackBtn = document.getElementById('attack-btn');
 
-  const width = canvas.width;
-  const height = canvas.height;
+const width = canvas.width;
+const height = canvas.height;
 
-  const soul = {
-    x: width / 2,
-    y: height / 2,
-    radius: 15,
-    speed: 5,
-    dx: 0,
-    dy: 0,
-  };
+const soul = {
+  x: width / 2,
+  y: height / 2,
+  radius: 15,
+  speed: 5,
+  dx: 0,
+  dy: 0,
+  hp: 3,
+  invincibleTimer: 0,
+};
 
-  let bullets = [];
-  let lastSpawn = 0;
-  let spawnInterval = 1000; // ms
-  let survivalTime = 0;
-  let gameOver = false;
+let bullets = [];
+let bones = [];
+let gasterBlasters = [];
 
-  // Control state
-  const keys = {};
+let lastSpawn = 0;
+let spawnInterval = 600;
+let survivalTime = 0;
+let gameOver = false;
 
-  window.addEventListener('keydown', e => {
-    keys[e.key.toLowerCase()] = true;
-  });
-  window.addEventListener('keyup', e => {
-    keys[e.key.toLowerCase()] = false;
-  });
+// Attack phases including new bone and gaster attacks
+const phases = ['fast', 'big', 'homing', 'bone', 'gaster'];
+let currentPhase = 0;
+let phaseDuration = 8000; // ms per phase
+let phaseTimer = 0;
+let canAttack = false;
+let enemyHp = 5;
 
-  restartBtn.addEventListener('click', () => {
-    resetGame();
-  });
+const keys = {};
+window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-  // Different bullet types with properties
-  // type: 'fast', 'big', 'homing'
-  // fast = small, fast bullets
-  // big = big, slow bullets
-  // homing = medium size, slowly chase you
-
-  function spawnBullet() {
-    const edges = ['top', 'right', 'bottom', 'left'];
-    const edge = edges[Math.floor(Math.random() * edges.length)];
-
-    // Pick a random bullet type weighted (you can tweak this)
-    const types = ['fast', 'fast', 'fast', 'big', 'homing']; 
-    const type = types[Math.floor(Math.random() * types.length)];
-
-    let x, y;
-
-    switch(edge){
-      case 'top':
-        x = Math.random() * width;
-        y = -30;
-        break;
-      case 'right':
-        x = width + 30;
-        y = Math.random() * height;
-        break;
-      case 'bottom':
-        x = Math.random() * width;
-        y = height + 30;
-        break;
-      case 'left':
-        x = -30;
-        y = Math.random() * height;
-        break;
+restartBtn.addEventListener('click', resetGame);
+attackBtn.addEventListener('click', () => {
+  if(canAttack){
+    enemyHp--;
+    canAttack = false;
+    attackBtn.style.display = 'none';
+    info.textContent = `You attacked the enemy! Enemy HP: ${enemyHp}`;
+    if(enemyHp <= 0){
+      info.textContent = 'YOU FUCKING WON! Restart to play again.';
+      gameOver = true;
+      attackBtn.style.display = 'none';
+    } else {
+      setTimeout(() => startNextPhase(), 1500);
     }
-
-    let radius, speed, vx, vy;
-
-    if(type === 'fast'){
-      radius = 6;
-      speed = 5 + survivalTime * 0.001; // speeds up a little over time
-      // shoot roughly at soul with randomness
-      let targetX = soul.x + (Math.random() * 100 - 50);
-      let targetY = soul.y + (Math.random() * 100 - 50);
-      const angle = Math.atan2(targetY - y, targetX - x);
-      vx = Math.cos(angle) * speed;
-      vy = Math.sin(angle) * speed;
-    } 
-    else if(type === 'big'){
-      radius = 14;
-      speed = 2 + survivalTime * 0.0005; // slow and heavy
-      let targetX = soul.x + (Math.random() * 200 - 100);
-      let targetY = soul.y + (Math.random() * 200 - 100);
-      const angle = Math.atan2(targetY - y, targetX - x);
-      vx = Math.cos(angle) * speed;
-      vy = Math.sin(angle) * speed;
-    } 
-    else if(type === 'homing'){
-      radius = 10;
-      speed = 3 + survivalTime * 0.0007; // medium speed homing bullet
-      // homing bullets get their velocity updated every frame, start with zero velocity for now
-      vx = 0;
-      vy = 0;
-    }
-
-    bullets.push({ x, y, vx, vy, radius, type, speed });
   }
+});
 
-  function updateSoul(){
-    soul.dx = 0;
-    soul.dy = 0;
-    if(keys['arrowleft'] || keys['a']) soul.dx = -soul.speed;
-    if(keys['arrowright'] || keys['d']) soul.dx = soul.speed;
-    if(keys['arrowup'] || keys['w']) soul.dy = -soul.speed;
-    if(keys['arrowdown'] || keys['s']) soul.dy = soul.speed;
-
-    if(soul.dx !== 0 && soul.dy !== 0){
-      soul.dx *= Math.SQRT1_2;
-      soul.dy *= Math.SQRT1_2;
-    }
-
-    soul.x += soul.dx;
-    soul.y += soul.dy;
-
-    soul.x = Math.min(width - soul.radius, Math.max(soul.radius, soul.x));
-    soul.y = Math.min(height - soul.radius, Math.max(soul.radius, soul.y));
+// Bullet constructor (fast, big, homing)
+class Bullet {
+  constructor(x, y, vx, vy, radius, type, speed){
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.radius = radius;
+    this.type = type;
+    this.speed = speed;
+    this.homingTime = 0;
+    this.originalDir = { vx, vy };
+    this.bounced = false;
   }
-
-  function updateBullets(delta){
-    bullets.forEach(b => {
-      if(b.type === 'homing'){
-        // Update velocity toward soul
-        const angle = Math.atan2(soul.y - b.y, soul.x - b.x);
-        b.vx = Math.cos(angle) * b.speed;
-        b.vy = Math.sin(angle) * b.speed;
+  update(delta){
+    if(this.type === 'homing'){
+      this.homingTime += delta;
+      if(this.homingTime < 1000 + Math.random() * 1000){
+        const angle = Math.atan2(soul.y - this.y, soul.x - this.x);
+        this.vx = Math.cos(angle) * this.speed;
+        this.vy = Math.sin(angle) * this.speed;
+      } else if(!this.bounced){
+        this.vx = this.originalDir.vx;
+        this.vy = this.originalDir.vy;
+        this.bounced = true;
       }
-      b.x += b.vx;
-      b.y += b.vy;
-    });
-
-    bullets = bullets.filter(b => b.x > -50 && b.x < width + 50 && b.y > -50 && b.y < height + 50);
+    }
+    this.x += this.vx;
+    this.y += this.vy;
   }
-
-  function drawSoul(){
+  draw(ctx){
     ctx.beginPath();
-    ctx.fillStyle = '#e03e3e';
-    ctx.shadowColor = '#e03e3e';
-    ctx.shadowBlur = 15;
-    ctx.arc(soul.x, soul.y, soul.radius, 0, Math.PI * 2);
+    if(this.type === 'fast') {
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = '#fff';
+      ctx.shadowBlur = 8;
+    } else if(this.type === 'big'){
+      ctx.fillStyle = '#ff5555';
+      ctx.shadowColor = '#ff5555';
+      ctx.shadowBlur = 12;
+    } else if(this.type === 'homing'){
+      ctx.fillStyle = '#55ffff';
+      ctx.shadowColor = '#55ffff';
+      ctx.shadowBlur = 12;
+    }
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
   }
-
-  function drawBullets(){
-    bullets.forEach(b => {
-      ctx.beginPath();
-      if(b.type === 'fast') {
-        ctx.fillStyle = '#fff';
-        ctx.shadowColor = '#fff';
-        ctx.shadowBlur = 8;
-      } else if(b.type === 'big'){
-        ctx.fillStyle = '#ff5555';
-        ctx.shadowColor = '#ff5555';
-        ctx.shadowBlur = 12;
-      } else if(b.type === 'homing'){
-        ctx.fillStyle = '#55ffff';
-        ctx.shadowColor = '#55ffff';
-        ctx.shadowBlur = 12;
-      }
-      ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    });
+  isOffscreen(){
+    return this.x < -50 || this.x > width + 50 || this.y < -50 || this.y > height + 50;
   }
+}
 
-  function checkCollision(){
-    for(let b of bullets){
-      const dx = b.x - soul.x;
-      const dy = b.y - soul.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if(dist < b.radius + soul.radius){
-        return true;
-      }
-    }
-    return false;
+// Bone constructor (shoots horizontally or vertically)
+class Bone {
+  constructor(x, y, vx, vy){
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.width = 40;
+    this.height = 10;
+    this.hitboxRadius = 10;
   }
+  update(){
+    this.x += this.vx;
+    this.y += this.vy;
+  }
+  draw(ctx){
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 8;
+    ctx.fillRect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+    ctx.shadowBlur = 0;
+  }
+  isOffscreen(){
+    return this.x < -50 || this.x > width + 50 || this.y < -50 || this.y > height + 50;
+  }
+  collidesWithSoul(){
+    // Circle-rect collision approximation
+    let distX = Math.abs(soul.x - this.x);
+    let distY = Math.abs(soul.y - this.y);
+    if(distX > (this.width/2 + soul.radius)) return false;
+    if(distY > (this.height/2 + soul.radius)) return false;
+    if(distX <= (this.width/2)) return true;
+    if(distY <= (this.height/2)) return true;
+    let dx = distX - this.width/2;
+    let dy = distY - this.height/2;
+    return (dx*dx + dy*dy <= soul.radius * soul.radius);
+  }
+}
 
-  function gameLoop(timestamp){
-    if(!lastTime) lastTime = timestamp;
-    const delta = timestamp - lastTime;
-    lastTime = timestamp;
-
-    if(gameOver) return;
-
-    ctx.clearRect(0, 0, width, height);
-
-    updateSoul();
-
-    if(timestamp - lastSpawn > spawnInterval){
-      spawnBullet();
-      lastSpawn = timestamp;
-      // Make shit harder gradually
-      if(spawnInterval > 250) spawnInterval -= 10;
-      survivalTime += delta;
+// Gaster Blaster constructor
+class GasterBlaster {
+  constructor(x, y, angle){
+    this.x = x;
+    this.y = y;
+    this.angle = angle;
+    this.chargeTime = 2000; // ms charging
+    this.fireTime = 1500; // ms firing laser
+    this.timer = 0;
+    this.state = 'charging'; // charging, firing, done
+  }
+  update(delta){
+    this.timer += delta;
+    if(this.state === 'charging' && this.timer >= this.chargeTime){
+      this.state = 'firing';
+      this.timer = 0;
+    } else if(this.state === 'firing' && this.timer >= this.fireTime){
+      this.state = 'done';
     }
-
-    updateBullets(delta);
-
-    drawSoul();
-    drawBullets();
-
-    if(checkCollision()){
-      gameOver = true;
-      gameOverText.style.display = 'block';
-      restartBtn.style.display = 'block';
-      info.textContent = `You lasted ${(survivalTime / 1000).toFixed(2)} seconds. Not bad, but not good enough!`;
-      return;
-    }
-
+  }
+  draw(ctx){
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+    // Draw skull
     ctx.fillStyle = '#eee';
-    ctx.font = '20px monospace';
-    ctx.fillText(`Time: ${(survivalTime / 1000).toFixed(2)}s`, 10, 30);
+    ctx.shadowColor = '#eee';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 40, 20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Eyes
+    ctx.fillStyle = '#e03e3e';
+    ctx.beginPath();
+    ctx.ellipse(-15, -5, 6, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(15, -5, 6, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
-    requestAnimationFrame(gameLoop);
-  }
+    // Draw laser beam if firing
+    if(this.state === 'firing'){
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.angle);
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.6)';
+      ctx.shadowColor = 'rgba(255,0,0,0.8)';
+      ctx.shadowBlur = 20;
+      ctx.fillRect(40, -10, width, 20);
+      ctx.restore();
+    } else if(this.state === 'charging'){
+      // Draw warning line
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.angle);
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.4)';
+      ctx.lineWidth = 8;
+      ctx.setLine
+```
 
-  function resetGame(){
-    gameOver = false;
-    bullets = [];
-    soul.x = width / 2;
-    soul.y = height / 2;
-    survivalTime = 0;
-    spawnInterval = 1000;
-    lastSpawn = 0;
-    lastTime = performance.now();
-    gameOverText.style.display = 'none';
-    restartBtn.style.display = 'none';
-    info.textContent = 'Use arrow keys or WASD to move the soul. Dodge the damn bullets for as long as you fucking can! Now with fast, big, AND homing bullets. Good luck, asshole.';
-    requestAnimationFrame(gameLoop);
-  }
-
-  let lastTime = 0;
-  resetGame();
-</script>
-
-</body>
-</html>
