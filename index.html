@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Deltarune RP Prototype</title>
+<style>
+  body {
+    background: #222;
+    color: #eee;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 20px;
+    border: 3px solid #555;
+    border-radius: 10px;
+  }
+  #dialogue {
+    background: #111;
+    padding: 20px;
+    border-radius: 8px;
+    min-height: 120px;
+    margin-bottom: 20px;
+    font-size: 18px;
+    line-height: 1.4;
+  }
+  #choices button {
+    background: #444;
+    border: none;
+    color: #eee;
+    padding: 10px 15px;
+    margin: 5px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+  }
+  #choices button:hover {
+    background: #666;
+  }
+</style>
+</head>
+<body>
+
+<div id="dialogue">Welcome to the fucking Deltarune RP prototype. Ready to dive in?</div>
+
+<div id="choices">
+  <button onclick="choose(0)">Hell yeah, let’s go!</button>
+  <button onclick="choose(1)">Nah, maybe later.</button>
+</div>
+
+<script>
+  const dialogueEl = document.getElementById('dialogue');
+  const choicesEl = document.getElementById('choices');
+
+  // Dialogue tree
+  const script = [
+    {
+      text: "You find yourself in a dark hallway. What do you do?",
+      choices: [
+        { text: "Walk forward.", next: 1 },
+        { text: "Look around.", next: 2 }
+      ]
+    },
+    {
+      text: "You move ahead cautiously. Suddenly, a shadowy figure appears!",
+      choices: [
+        { text: "Talk to it.", next: 3 },
+        { text: "Prepare to fight.", next: 4 }
+      ]
+    },
+    {
+      text: "You spot some strange markings on the wall.",
+      choices: [
+        { text: "Inspect them.", next: 5 },
+        { text: "Ignore and move forward.", next: 1 }
+      ]
+    },
+    {
+      text: "The figure smiles. 'Welcome to the nightmare, friend.'",
+      choices: [
+        { text: "Fuck this shit, fight!", next: 4 },
+        { text: "Calmly listen.", next: 6 }
+      ]
+    },
+    {
+      text: "Battle system not implemented yet. For now, just chill and enjoy the fucking story.",
+      choices: [
+        { text: "Go back.", next: 0 }
+      ]
+    },
+    {
+      text: "The markings glow and you feel a surge of power. Nice.",
+      choices: [
+        { text: "Walk forward.", next: 1 }
+      ]
+    },
+    {
+      text: "The figure tells you secrets about the world. Shit’s getting deep.",
+      choices: [
+        { text: "Ask more.", next: 6 },
+        { text: "Say goodbye.", next: 0 }
+      ]
+    }
+  ];
+
+  let currentNode = 0;
+
+  function choose(choiceIndex) {
+    const node = script[currentNode];
+    const choice = node.choices[choiceIndex];
+    currentNode = choice.next;
+    updateScene();
+  }
+
+  function updateScene() {
+    const node = script[currentNode];
+    dialogueEl.textContent = node.text;
+    choicesEl.innerHTML = '';
+    node.choices.forEach((choice, index) => {
+      const btn = document.createElement('button');
+      btn.textContent = choice.text;
+      btn.onclick = () => choose(index);
+      choicesEl.appendChild(btn);
+    });
+  }
+</script>
+
+</body>
+</html>
